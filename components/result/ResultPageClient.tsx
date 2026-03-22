@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -22,9 +21,9 @@ interface Session {
 }
 
 export default function ResultPageClient({ token }: { token: string }) {
-  const router = useRouter()
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
   const [showPaywall, setShowPaywall] = useState(false)
   const [copied, setCopied] = useState(false)
   const [fakeProgress, setFakeProgress] = useState(0)
@@ -45,53 +44,33 @@ export default function ResultPageClient({ token }: { token: string }) {
   useEffect(() => {
     let cancelled = false
     let retries = 0
-    const maxRetries = 80
+    const maxRetries = 80      // ~3.5 min total
+    let notFoundRetries = 0
+    const maxNotFound = 15     // wait up to ~15s for session to appear in DB
 
     async function poll() {
       if (cancelled) return
       try {
         const res = await fetch(`/api/result/${token}`)
 
-        // 404 means session not yet in DB — check sessionStorage for pending quiz data
         if (res.status === 404) {
-          if (!generationTriggered.current) {
-            const pending = sessionStorage.getItem(`revoa_pending_${token}`)
-            if (pending) {
-              generationTriggered.current = true
-              sessionStorage.removeItem(`revoa_pending_${token}`)
-              const { quiz_id, answers } = JSON.parse(pending)
-              // Create session in DB then generate
-              fetch('/api/quiz/start', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token, quiz_id, answers }),
-              }).then(() => {
-                fetch('/api/result/generate', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ token, tier: 'free', quiz_id, answers }),
-                }).catch(console.error)
-              }).catch(console.error)
-            } else {
-              // No sessionStorage — could be a shared link or stale token
-              // Retry a few times before giving up (race condition guard)
-              retries++
-              if (retries >= 5) {
-                setLoading(false)
-                // Show error state — session genuinely doesn't exist
-                setSession({ token, quiz_id: '', quiz_title: '', quiz_emoji: '❌', quiz_category: '', tier: 'free', status: 'error', result: null })
-                return
-              }
-              setTimeout(poll, 1500)
-              return
-            }
+          // Session not in DB yet — the background fetch from QuizFlow may still be in flight
+          notFoundRetries++
+          if (notFoundRetries >= maxNotFound) {
+            setLoading(false)
+            setNotFound(true)
+            return
           }
-          retries++
-          if (retries < maxRetries) setTimeout(poll, 1000)
+          setTimeout(poll, 1000)
           return
         }
 
-        if (!res.ok) { router.push('/'); return }
+        if (!res.ok) {
+          setLoading(false)
+          setNotFound(true)
+          return
+        }
+
         const data = await res.json()
         if (!cancelled) {
           setSession(data)
@@ -104,7 +83,7 @@ export default function ResultPageClient({ token }: { token: string }) {
         }
         if (data.status === 'error') return
 
-        // Trigger generation if still pending and we haven't yet
+        // Trigger generation from client if still pending (serverless-safe)
         if (data.status === 'pending' && !generationTriggered.current) {
           generationTriggered.current = true
           const answers = data.answers ?? []
@@ -131,7 +110,7 @@ export default function ResultPageClient({ token }: { token: string }) {
 
     poll()
     return () => { cancelled = true }
-  }, [token, router])
+  }, [token])
 
   function copyLink() {
     navigator.clipboard.writeText(shareUrl)
@@ -145,7 +124,7 @@ export default function ResultPageClient({ token }: { token: string }) {
       <div className="min-h-screen flex flex-col items-center justify-center px-4 text-center">
         <div className="text-4xl mb-6 animate-pulse">{session?.quiz_emoji ?? '✨'}</div>
         <h2 className="text-xl font-semibold mb-2">
-          {session?.quiz_title ?? 'Analisando...'}
+          {session?.quiz_title ?? 'Preparando...'}
         </h2>
         <p className="text-muted-foreground text-sm mb-8 max-w-xs leading-relaxed">
           A IA está lendo o padrão por trás das suas respostas.
@@ -170,6 +149,18 @@ export default function ResultPageClient({ token }: { token: string }) {
             {copied ? '✓ Copiado!' : 'Copiar link'}
           </button>
         </div>
+      </div>
+    )
+  }
+
+  if (notFound) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 text-center gap-4">
+        <p className="text-lg">Link inválido ou sessão expirada.</p>
+        <p className="text-sm text-muted-foreground">Refaça o quiz para gerar um novo resultado.</p>
+        <Button asChild>
+          <Link href="/">Ver quizzes</Link>
+        </Button>
       </div>
     )
   }

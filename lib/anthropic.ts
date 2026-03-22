@@ -45,7 +45,7 @@ ${tier === 'premium' ? 'Inclua 4-5 secoes cobrindo: padrao central, o que isso r
 Responda APENAS com o JSON valido, sem markdown code blocks.`
 
   const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5',
+    model: 'claude-sonnet-4-6',
     max_tokens: tier === 'premium' ? 2000 : 1200,
     messages: [{ role: 'user', content: userPrompt }],
     system: systemPrompt,

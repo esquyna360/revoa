@@ -59,11 +59,13 @@ export default function QuizFlow({ quiz }: Props) {
 
   function submitAnswers(finalAnswers: QuizAnswer[]) {
     const token = uuidv4()
-    // Store data for the result page to pick up and initialize
-    sessionStorage.setItem(
-      `revoa_pending_${token}`,
-      JSON.stringify({ quiz_id: quiz.id, answers: finalAnswers })
-    )
+    // Fire-and-forget: create session in DB in background, then navigate immediately
+    // Result page will wait for session to appear before triggering generation
+    fetch('/api/quiz/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, quiz_id: quiz.id, answers: finalAnswers }),
+    }).catch(console.error)
     router.push(`/r/${token}`)
   }
 
