@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       quiz_title: quiz.title,
       quiz_category: quiz.category,
       quiz_emoji: quiz.emoji,
-      answers: JSON.stringify(answers),
+      answers,
       tier: 'free',
       status: 'pending',
     })
@@ -37,5 +37,5 @@ export async function POST(req: NextRequest) {
   }
 
   // Return token immediately — client will trigger generation
-  return NextResponse.json({ token, quiz_id, answers: JSON.stringify(answers) })
+  return NextResponse.json({ token, quiz_id, answers })
 }

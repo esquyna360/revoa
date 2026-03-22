@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       .from('quiz_sessions')
       .update({
         status: 'ready',
-        result: JSON.stringify(result),
+        result,
       })
       .eq('token', token)
 
