@@ -27,6 +27,7 @@ export async function GET(
     tier: data.tier,
     status: data.status,
     result: data.result ? JSON.parse(data.result) : null,
+    answers: data.answers, // needed by client to trigger generation
     payment_id: data.payment_id,
     created_at: data.created_at,
   })

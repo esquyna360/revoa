@@ -36,12 +36,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to save session' }, { status: 500 })
   }
 
-  // Trigger async AI generation (fire and forget)
-  fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/result/generate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token, tier: 'free', quiz_id, answers }),
-  }).catch(console.error)
-
-  return NextResponse.json({ token })
+  // Return token immediately — client will trigger generation
+  return NextResponse.json({ token, quiz_id, answers: JSON.stringify(answers) })
 }
