@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     console.error('DB error:', error)
-    return NextResponse.json({ error: 'Failed to save session', detail: error.message, code: error.code }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to save session' }, { status: 500 })
   }
 
   // Return token immediately — client will trigger generation
