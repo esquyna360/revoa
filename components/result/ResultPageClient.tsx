@@ -73,8 +73,16 @@ export default function ResultPageClient({ token }: { token: string }) {
                 }).catch(console.error)
               }).catch(console.error)
             } else {
-              // No pending data and no session — invalid token, go home
-              router.push('/')
+              // No sessionStorage — could be a shared link or stale token
+              // Retry a few times before giving up (race condition guard)
+              retries++
+              if (retries >= 5) {
+                setLoading(false)
+                // Show error state — session genuinely doesn't exist
+                setSession({ token, quiz_id: '', quiz_title: '', quiz_emoji: '❌', quiz_category: '', tier: 'free', status: 'error', result: null })
+                return
+              }
+              setTimeout(poll, 1500)
               return
             }
           }
