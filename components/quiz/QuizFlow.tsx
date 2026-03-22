@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { v4 as uuidv4 } from 'uuid'
 import { Quiz, QuizAnswer } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -16,7 +17,6 @@ export default function QuizFlow({ quiz }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<QuizAnswer[]>([])
   const [currentAnswer, setCurrentAnswer] = useState<string | number | null>(null)
-  const [submitting, setSubmitting] = useState(false)
   const [scaleValue, setScaleValue] = useState<number>(5)
 
   const questions = quiz.free_questions
@@ -51,30 +51,20 @@ export default function QuizFlow({ quiz }: Props) {
     setScaleValue(5)
 
     if (isLast) {
-      await submitAnswers(newAnswers)
+      submitAnswers(newAnswers)
     } else {
       setCurrentIndex((i) => i + 1)
     }
   }
 
-  async function submitAnswers(finalAnswers: QuizAnswer[]) {
-    setSubmitting(true)
-    try {
-      const res = await fetch('/api/quiz/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          quiz_id: quiz.id,
-          answers: finalAnswers,
-        }),
-      })
-      const data = await res.json()
-      if (data.token) {
-        router.push(`/r/${data.token}`)
-      }
-    } catch {
-      setSubmitting(false)
-    }
+  function submitAnswers(finalAnswers: QuizAnswer[]) {
+    const token = uuidv4()
+    // Store data for the result page to pick up and initialize
+    sessionStorage.setItem(
+      `revoa_pending_${token}`,
+      JSON.stringify({ quiz_id: quiz.id, answers: finalAnswers })
+    )
+    router.push(`/r/${token}`)
   }
 
   const canProceed =
@@ -164,15 +154,11 @@ export default function QuizFlow({ quiz }: Props) {
       {/* Next button */}
       <Button
         onClick={handleNext}
-        disabled={!canProceed || submitting}
+        disabled={!canProceed}
         size="lg"
         className="w-full h-12 bg-primary hover:bg-primary/90 text-white disabled:opacity-40"
       >
-        {submitting
-          ? 'Analisando...'
-          : isLast
-          ? 'Ver meu resultado'
-          : 'Próxima'}
+        {isLast ? 'Ver meu resultado' : 'Próxima'}
       </Button>
 
       {/* Skip option for free text */}

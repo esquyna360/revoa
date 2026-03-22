@@ -51,6 +51,38 @@ export default function ResultPageClient({ token }: { token: string }) {
       if (cancelled) return
       try {
         const res = await fetch(`/api/result/${token}`)
+
+        // 404 means session not yet in DB — check sessionStorage for pending quiz data
+        if (res.status === 404) {
+          if (!generationTriggered.current) {
+            const pending = sessionStorage.getItem(`revoa_pending_${token}`)
+            if (pending) {
+              generationTriggered.current = true
+              sessionStorage.removeItem(`revoa_pending_${token}`)
+              const { quiz_id, answers } = JSON.parse(pending)
+              // Create session in DB then generate
+              fetch('/api/quiz/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token, quiz_id, answers }),
+              }).then(() => {
+                fetch('/api/result/generate', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ token, tier: 'free', quiz_id, answers }),
+                }).catch(console.error)
+              }).catch(console.error)
+            } else {
+              // No pending data and no session — invalid token, go home
+              router.push('/')
+              return
+            }
+          }
+          retries++
+          if (retries < maxRetries) setTimeout(poll, 1000)
+          return
+        }
+
         if (!res.ok) { router.push('/'); return }
         const data = await res.json()
         if (!cancelled) {
@@ -64,7 +96,7 @@ export default function ResultPageClient({ token }: { token: string }) {
         }
         if (data.status === 'error') return
 
-        // Trigger generation from client if still pending (serverless-safe)
+        // Trigger generation if still pending and we haven't yet
         if (data.status === 'pending' && !generationTriggered.current) {
           generationTriggered.current = true
           const answers = data.answers ?? []

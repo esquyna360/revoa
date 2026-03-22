@@ -7,14 +7,14 @@ import { QuizAnswer } from '@/types'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { quiz_id, answers }: { quiz_id: string; answers: QuizAnswer[] } = body
+  const { quiz_id, answers, token: providedToken }: { quiz_id: string; answers: QuizAnswer[]; token?: string } = body
 
   const quiz = getQuizBySlug(quiz_id)
   if (!quiz) {
     return NextResponse.json({ error: 'Quiz not found' }, { status: 404 })
   }
 
-  const token = uuidv4()
+  const token = providedToken ?? uuidv4()
 
   // Store the session in Supabase
   const { error } = await supabaseAdmin
